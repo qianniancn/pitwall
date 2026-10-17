@@ -13,12 +13,14 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	gioapp "gioui.org/app"
 	"github.com/charmbracelet/x/term"
 	"github.com/quanticstudios/pitwall/internal/agent"
 	"github.com/quanticstudios/pitwall/internal/config"
@@ -124,20 +126,23 @@ func main() {
 		return
 	case "":
 		bundleEnv()
-		err = runGUI("")
+		onMain(cmd, func() error { return runGUI("") })
+		return
 	case "-s":
 		if len(os.Args) != 3 || os.Args[2] == "" {
 			fmt.Fprint(os.Stderr, usage)
 			os.Exit(2)
 		}
-		err = runGUI(os.Args[2])
+		onMain(cmd, func() error { return runGUI(os.Args[2]) })
+		return
 	case "--host":
 		host, session, ok := parseHost(os.Args[2:])
 		if !ok {
 			fmt.Fprint(os.Stderr, usage)
 			os.Exit(2)
 		}
-		err = runHostGUI(host, session)
+		onMain(cmd, func() error { return runHostGUI(host, session) })
+		return
 	case "remote-start":
 		err = runRemoteStart(os.Args[2:], os.Stdout)
 	case "daemon":
@@ -170,6 +175,24 @@ func main() {
 		fmt.Fprint(os.Stderr, usage)
 		os.Exit(2)
 	}
+	exit(cmd, err)
+}
+
+// onMain runs a GUI command. macOS needs the main thread for [NSApp run]
+// (gioapp.Main), or Gio's new window waits forever for the app to launch.
+func onMain(cmd string, f func() error) {
+	if runtime.GOOS != "darwin" {
+		exit(cmd, f())
+		return
+	}
+	go func() {
+		exit(cmd, f())
+		os.Exit(0)
+	}()
+	gioapp.Main()
+}
+
+func exit(cmd string, err error) {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "pitwall:", err)
 		if cmd == "" || cmd == "-s" || cmd == "--host" {
