@@ -15,8 +15,10 @@ pass) and opens a `Release v0.1.0-beta.N` pull request. Once that merges,
 release commit on `main` and pushes the tag once, which starts the release
 build. Either step takes `--dry-run`.
 
-## Unreleased
+## v0.1.0-beta.12
 
+- On macOS, the window opens. pitwall never started AppKit's event loop on
+  the main thread, so the window never appeared (#122).
 - On Wayland, a pane types the active keyboard layout's letters with three
   layouts or more, and on GNOME with two: GNOME adds the locale's layout to
   the keymap, so us and ru typed Latin letters after switching to Russian
